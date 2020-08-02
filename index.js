@@ -2,9 +2,16 @@ const getAliases = resolve => {
   const exact = {};
   const wildcards = [];
   for (const [key, val] of Object.entries(resolve)) {
-    const [ name, wildcard ] = key.split('*');
-    if (wildcard === '') wildcards.push([name, val]);
-    else exact[name] = val;
+    if (key.endsWith('_')) {
+      const name = key.slice(0, -1);
+      wildcards.push([`${name}/`, `${val}/`]);
+      exact[name] = val;
+    } else if (key.endsWith('*')) {
+      const name = key.slice(0, -1);
+      wildcards.push([name, val]);
+    } else {
+      exact[key] = val;
+    }
   }
   return {exact, wildcards};
 };
@@ -37,46 +44,48 @@ const notImport = (t, nodePath) => {
     nodePath.scope.hasBinding('import');
 };
 
+let aliases = null;
+
 module.exports = function ({ types: t }) {
   return {
     visitor: {
-      CallExpression(nodePath, state) {
+      Program(nodePath, state) {
         const resolve = (state.opts && state.opts.resolve);
-        if (!resolve) return;
+        if (!resolve) {
+          aliases = null;
+          return;
+        }
+        aliases = getAliases(resolve);
+      },
+      CallExpression(nodePath) {
+        if (!aliases) return;
         const { node } = nodePath;
         if (notRequire(t, nodePath) && notImport(t, nodePath)) return;
         const [requireArg] = node.arguments;
         const { value: modName } = requireArg;
         if (notNameImport(modName)) return;
-        const aliases = getAliases(resolve);
         requireArg.value = resolveModulePath(aliases, modName);
       },
-      ExportNamedDeclaration(nodePath, state) {
-        const resolve = (state.opts && state.opts.resolve);
-        if (!resolve) return;
+      ExportNamedDeclaration(nodePath) {
+        if (!aliases) return;
         const { source } = nodePath.node;
         if (source === null) return;
         const { value: modName } = source;
         if (notNameImport(modName)) return;
-        const aliases = getAliases(resolve);
         nodePath.node.source.value = resolveModulePath(aliases, modName);
       },
-      ExportAllDeclaration(nodePath, state) {
-        const resolve = (state.opts && state.opts.resolve);
-        if (!resolve) return;
+      ExportAllDeclaration(nodePath) {
+        if (!aliases) return;
         const { source } = nodePath.node;
         if (source === null) return;
         const { value: modName } = source;
         if (notNameImport(modName)) return;
-        const aliases = getAliases(resolve);
         nodePath.node.source.value = resolveModulePath(aliases, modName);
       },
-      ImportDeclaration(nodePath, state) {
-        const resolve = (state.opts && state.opts.resolve);
-        if (!resolve) return;
+      ImportDeclaration(nodePath) {
+        if (!aliases) return;
         const { value: modName } = nodePath.node.source;
         if (notNameImport(modName)) return;
-        const aliases = getAliases(resolve);
         nodePath.node.source.value = resolveModulePath(aliases, modName);
       },
     },

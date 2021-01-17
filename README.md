@@ -3,13 +3,13 @@ Resolve module names
 
 # Installation
 ```sh
-npm install hqjs@babel-plugin-resolve-modules
+npm install @hqjs/babel-plugin-resolve-modules
 ```
 
 # Usage
 ```json
 {
-  "plugins": [[ "hqjs@babel-plugin-resolve-modules", {
+  "plugins": [[ "@hqjs/babel-plugin-resolve-modules", {
       "resolve": {
         "foo": "/packages/foo",
         "bar/*": "/packages/bar/",
